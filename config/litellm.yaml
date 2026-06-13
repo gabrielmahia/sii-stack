@@ -1,0 +1,83 @@
+# LiteLLM Configuration — AI-KungFU SII Stack
+# Tri-polar routing: Western / Eastern / Sovereign
+# Rule: No vendor lock-in. Switch providers via env var only.
+# Budget: Default to models < $1.00/M tokens
+
+model_list:
+
+  # ── WESTERN STACK (analytical/verification) ─────────────────────────────────
+  - model_name: "reasoning"
+    litellm_params:
+      model: "claude-haiku-4-5"
+      api_key: "os.environ/ANTHROPIC_API_KEY"
+    model_info:
+      mode: "chat"
+      cost_per_token: 0.00000025
+      tier: "western"
+      use_for: "complex_reasoning, legal, medical verification"
+
+  - model_name: "western-fast"
+    litellm_params:
+      model: "openrouter/google/gemini-flash-1.5-8b"
+      api_key: "os.environ/OPENROUTER_API_KEY"
+    model_info:
+      tier: "western"
+      use_for: "fast drafts, translations, summaries"
+
+  # ── EASTERN STACK (bulk processing, cheap) ──────────────────────────────────
+  - model_name: "bulk"
+    litellm_params:
+      model: "deepseek/deepseek-chat"
+      api_key: "os.environ/DEEPSEEK_API_KEY"
+    model_info:
+      tier: "eastern"
+      cost_per_token: 0.00000014
+      use_for: "bulk classification, form filling, batch processing"
+
+  - model_name: "eastern-fast"
+    litellm_params:
+      model: "siliconflow/Qwen/Qwen2.5-7B-Instruct"
+      api_key: "os.environ/SILICONFLOW_API_KEY"
+    model_info:
+      tier: "eastern"
+      use_for: "Swahili processing, multilingual tasks"
+
+  # ── SOVEREIGN STACK (offline, local, sensitive data) ────────────────────────
+  - model_name: "sovereign"
+    litellm_params:
+      model: "ollama/llama3.2:3b"
+      api_base: "http://ollama:11434"
+    model_info:
+      tier: "sovereign"
+      cost_per_token: 0
+      use_for: "sensitive data, offline operation, privacy-critical tasks"
+
+  - model_name: "sovereign-multilingual"
+    litellm_params:
+      model: "ollama/qwen2.5:3b"
+      api_base: "http://ollama:11434"
+    model_info:
+      tier: "sovereign"
+      use_for: "Swahili offline, rural deployment"
+
+# ── ROUTING RULES ─────────────────────────────────────────────────────────────
+router_settings:
+  routing_strategy: "latency-based-routing"
+  fallbacks:
+    - reasoning: ["bulk", "sovereign"]
+    - bulk: ["eastern-fast", "sovereign"]
+    - sovereign: []  # No fallback — if local fails, fail gracefully
+  num_retries: 2
+  timeout: 30  # 4000ms per Document 6 spec → use 30s for LLM latency
+
+# ── BUDGET ENFORCEMENT ────────────────────────────────────────────────────────
+litellm_settings:
+  max_budget: 50.00  # Monthly cap in USD
+  budget_duration: "1mo"
+  drop_params: true  # Don't fail on unsupported params
+  set_verbose: false
+
+# ── GUARDRAILS ───────────────────────────────────────────────────────────────
+general_settings:
+  master_key: "os.environ/LITELLM_MASTER_KEY"
+  database_url: "os.environ/DATABASE_URL"
