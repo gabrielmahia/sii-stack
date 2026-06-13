@@ -1,0 +1,148 @@
+version: '3.8'
+
+# AI-KungFU Sovereign Institutional Infrastructure (SII) Stack
+# East Africa Coordination Infrastructure — Production Deployment
+# Architecture: 4-tier decoupled async system with graceful offline degradation
+
+services:
+
+  # ── TIER 1: Context & Memory Layer ─────────────────────────────────────────
+  git-sync:
+    image: alpine/git
+    container_name: sii-context
+    volumes:
+      - ./data/knowledge:/workspace
+    entrypoint: ["sh", "-c", "git config --global --add safe.directory /workspace && tail -f /dev/null"]
+    restart: unless-stopped
+    profiles: ["full", "context"]
+
+  # ── TIER 2: Orchestration Layer ────────────────────────────────────────────
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: sii-orchestration
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
+      - NODE_ENV=production
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB:-sii}
+      - DB_POSTGRESDB_USER=${POSTGRES_USER:-sii}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD:-changeme}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:-changeme-32-char-key-here-1234}
+      - QUEUE_BULL_REDIS_HOST=redis
+      - EXECUTIONS_MODE=queue
+    volumes:
+      - ./data/n8n:/home/node/.n8n
+      - ./workflows:/home/node/workflows
+    depends_on:
+      - postgres
+      - redis
+    profiles: ["full", "orchestration"]
+
+  redis:
+    image: redis:7-alpine
+    container_name: sii-redis
+    restart: unless-stopped
+    volumes:
+      - ./data/redis:/data
+    profiles: ["full", "orchestration"]
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: sii-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sii}
+      POSTGRES_USER: ${POSTGRES_USER:-sii}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+      - ./schema/init.sql:/docker-entrypoint-initdb.d/init.sql
+    profiles: ["full", "orchestration"]
+
+  # ── TIER 3: Commodity Intelligence Layer ────────────────────────────────────
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: sii-intelligence
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./config/litellm.yaml:/app/config.yaml
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "4"]
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - SILICONFLOW_API_KEY=${SILICONFLOW_API_KEY:-}
+    depends_on:
+      - ollama
+    profiles: ["full", "intelligence"]
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: sii-sovereign
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./data/ollama:/root/.ollama
+    profiles: ["full", "intelligence", "offline"]
+    # For GPU: add deploy.resources.reservations.devices
+
+  # ── TIER 4: Delivery & Edge Layer ──────────────────────────────────────────
+  api-gateway:
+    build: ./gateway
+    container_name: sii-gateway
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - LITELLM_URL=http://litellm:4000
+      - N8N_URL=http://n8n:5678
+      - DATABASE_URL=postgresql://sii:changeme@postgres:5432/sii
+    depends_on:
+      - litellm
+      - n8n
+    profiles: ["full", "delivery"]
+
+  # ── MCP Server Cluster ──────────────────────────────────────────────────────
+  mcp-economic:
+    image: python:3.12-slim
+    container_name: sii-mcp-economic
+    restart: unless-stopped
+    command: >
+      sh -c "pip install mpesa-mcp mkopo-mcp bima-mcp soko-mcp sifa-mcp remit-mcp kra-mcp faida-mcp -q
+      && echo 'Economic MCP cluster ready'"
+    profiles: ["full", "mcp"]
+
+  mcp-social:
+    image: python:3.12-slim
+    container_name: sii-mcp-social
+    restart: unless-stopped
+    command: >
+      sh -c "pip install afya-mcp kilimo-mcp kazi-mcp haki-ya-kazi-mcp familia-mcp diaspora-mcp -q
+      && echo 'Social MCP cluster ready'"
+    profiles: ["full", "mcp"]
+
+  mcp-civic:
+    image: python:3.12-slim
+    container_name: sii-mcp-civic
+    restart: unless-stopped
+    command: >
+      sh -c "pip install county-mcp historia-mcp habari-mcp mazingira-mcp nyumba-mcp civic-agent-kit -q
+      && echo 'Civic MCP cluster ready'"
+    profiles: ["full", "mcp"]
+
+volumes:
+  postgres_data:
+  redis_data:
+  ollama_data:
+  n8n_data:
