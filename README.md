@@ -117,6 +117,26 @@ Mandatory human review for:
 
 ---
 
+
+## Data Sovereignty Architecture
+
+> This stack was designed for a specific constraint: communities must not be forced to choose between  
+> access to AI assistance and control of their own data.
+
+The tri-polar routing model is not just about cost. It is about independence:
+
+| Tier | Who Controls It | Data Exposure |
+|------|-----------------|---------------|
+| Western (Claude/Gemini) | US corporations | Aggregated, never raw personal data |
+| Eastern (DeepSeek/Qwen) | Chinese providers | Aggregated, never raw personal data |
+| **Sovereign (Ollama local)** | **The community** | **Zero — data never leaves the device** |
+
+**The 72-hour offline test** is the sovereignty test: if the internet goes down, the system must still
+work. Community data processed locally never becomes a bargaining chip in aid negotiations.
+
+**Human-in-the-loop is non-negotiable** for health, land, legal, and financial decisions.
+AI prepares. Communities certify.
+
 ## MVP Build Plan
 
 | Month | Focus |
