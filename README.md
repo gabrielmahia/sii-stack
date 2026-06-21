@@ -118,6 +118,36 @@ Mandatory human review for:
 ---
 
 
+
+## Design Philosophy
+
+**Three principles shaped every architectural decision:**
+
+### Build Rails, Not Trains
+The SII Stack is infrastructure, not an application.
+It provides the routing, orchestration, and local inference layer.
+What you build on top of it — health triage, land records, civic forms — is the train.
+The stack doesn't control the train. It makes the train possible.
+
+### Constraint Topology
+Before designing the stack, we mapped constraints into two buckets:
+
+| Unmovable | Movable |
+|-----------|---------|
+| Intermittent internet | Which LLM to use |
+| Limited device compute | Orchestration tool |
+| Data sovereignty requirements | Token budget |
+| Community trust deficit in foreign AI | Architecture patterns |
+
+We built against the unmovable constraints. We optimized the movable ones.
+
+### Stewardship, Not Ownership
+This stack is MIT licensed.
+The data processed by communities using this stack belongs to those communities.
+The local Ollama tier ensures no data leaves the device without explicit routing.
+We are stewards of the infrastructure. Communities are stewards of their data.
+
+---
 ## Data Sovereignty Architecture
 
 > This stack was designed for a specific constraint: communities must not be forced to choose between  
